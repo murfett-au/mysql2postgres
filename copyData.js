@@ -1,4 +1,12 @@
-import { config } from "./config";
+try {
+  configExports = require("./config");
+} catch (e) {
+  console.error(
+    `Please create config.js by copying configSample.js and editing it.`
+  );
+  process.exit(1);
+}
+const config = configExports.config;
 const { Sequelize, Op, DataTypes } = require("sequelize");
 const solarFieldNames = [
   `battSoc`,
