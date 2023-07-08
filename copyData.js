@@ -22,32 +22,39 @@ const dataTableFields = configSchema.tables.data.fields;
 
 const dataRangeTableFields = configSchema.tables.dataRange.fields;
 
+
+console.log(`Connecting to destination`);
+const destdb = new Sequelize(config.dest.database, config.dest.username, config.dest.password, {
+  host: config.dest.host,
+  dialect: config.dest.dialect,
+  port: config.dest.port,
+
+});
+console.log(`Connecting to source`);
+const sourceDb = new Sequelize(
+  config.source.database,
+  config.source.username,
+  config.source.password,
+  {
+    host: config.source.host,
+    dialect: config.source.dialect,
+    port: config.source.port,
+  }
+);
+console.log(`Connected to source and destination`)
+
+
 async function copySourceDbToDest({
   tableName,
   fields,
   primaryKeyField = "id",
-}) {
-  const destdb = new Sequelize(config.dest.database, config.dest.username, config.dest.password, {
-    host: config.dest.host,
-    dialect: config.dest.dialect,
-    port: config.dest.port,
-
-  });
-  const sourceDb = new Sequelize(
-    config.source.database,
-    config.source.username,
-    config.source.password,
-    {
-      host: config.source.host,
-      dialect: config.source.dialect,
-      port: config.source.port,
-    }
-  );
-  let source;
+}) {  let source;
   let dest;
-  destdb
+  console.debug(`authenticating with destination for table '${tableName}'`)
+  await destdb
     .authenticate()
     .then(function (result) {
+      console.debug(`authenticating with source for table '${tableName}'`)
       return sourceDb.authenticate();
     })
     .then(async function (result) {
