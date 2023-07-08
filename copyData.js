@@ -1,87 +1,61 @@
 try {
   configExports = require("./config");
 } catch (e) {
+  console.error(e);
   console.error(
     `Please create config.js by copying configSample.js and editing it.`
   );
   process.exit(1);
 }
 const config = configExports.config;
+const { configSchema } = require("./configSchema");
+console.debug("configSchema", configSchema);
 const { Sequelize, Op, DataTypes } = require("sequelize");
-const solarFieldNames = [
-  `battSoc`,
-  `panelV`,
-  `panelI`,
-  `loadV`,
-  `loadI`,
-  `battV`,
-  `battI`,
-  `battTemp`,
-  `panelW`,
-  `loadW`,
-  `tempEquip`,
-  `ambientTemp`,
 
-  `msb`,
-  `lsb`,
-];
 
-const solarFields = {
-  ts: {
-    type: DataTypes.TEXT,
-  },
-  loadState: { type: DataTypes.TEXT },
-};
-solarFieldNames.map((fieldName) => {
+const solarFields = configSchema.tables.solar.nonFloatFields;
+configSchema.tables.solar.floatFieldNames.map((fieldName) => {
   solarFields[fieldName] = { type: DataTypes.FLOAT };
 });
 
-const dataTableFields = {
-  ts: { type: DataTypes.DATE },
-  sensor: { type: DataTypes.TEXT },
-  value: { type: DataTypes.FLOAT },
-  units: { type: DataTypes.TEXT },
-};
+const dataTableFields = configSchema.tables.data.fields;
 
-const dataRangeTableFields = {
-  ts: { type: DataTypes.DATE },
-  sensor: { type: DataTypes.TEXT },
-  min: { type: DataTypes.FLOAT },
-  max: { type: DataTypes.FLOAT },
-  average: { type: DataTypes.FLOAT },
-  units: { type: DataTypes.TEXT },
-};
-async function copyMariaDbToPostgres({
+const dataRangeTableFields = configSchema.tables.dataRange.fields;
+
+async function copySourceDbToDest({
   tableName,
   fields,
   primaryKeyField = "id",
 }) {
-  const postgres = new Sequelize("yapeen", "postgres", "postgres", {
-    host: "localhost",
-    dialect: "postgres",
+  const destdb = new Sequelize(config.dest.database, config.dest.username, config.dest.password, {
+    host: config.dest.host,
+    dialect: config.dest.dialect,
+    port: config.dest.port,
+
   });
-  const mariaDb = new Sequelize(
-    config.mysql.database,
-    config.mysql.username,
-    config.mysql.password,
+  const sourceDb = new Sequelize(
+    config.source.database,
+    config.source.username,
+    config.source.password,
     {
-      host: config.mysql.host,
-      dialect: config.mysql.dialect,
+      host: config.source.host,
+      dialect: config.source.dialect,
+      port: config.source.port,
     }
   );
   let source;
   let dest;
-  postgres
+  destdb
     .authenticate()
     .then(function (result) {
-      return mariaDb.authenticate();
+      return sourceDb.authenticate();
     })
     .then(async function (result) {
-      source = mariaDb.define(tableName, fields, {
+      source = sourceDb.define(tableName, fields, {
         tableName,
         timestamps: false,
       });
-      dest = postgres.define(tableName, fields, {
+      dest = destdb.define(tableName, fields, {
         tableName,
         timestamps: false,
       });
@@ -120,15 +94,15 @@ async function copyMariaDbToPostgres({
     });
 }
 async function copyAllData() {
-  await copyMariaDbToPostgres({
+  await copySourceDbToDest({
     tableName: "data",
     fields: dataTableFields,
   });
-  await copyMariaDbToPostgres({
+  await copySourceDbToDest({
     tableName: "solar",
     fields: solarFields,
   });
-  await copyMariaDbToPostgres({
+  await copySourceDbToDest({
     tableName: "dataRange",
     fields: dataRangeTableFields,
   });
